@@ -27,26 +27,19 @@ we can use `let` to bind identifiers to lambdas. E.g.,
 (define p3 '(let ([f (lambda (x) (+ x 1))])
               (f 10)))
 
-;; p4-p5 for testing strict/lazy eval
-(define p4 '(let ([x (+ 1 2)])
-              20))
-
-(define p5 '(let ([f (lambda (x) 10)])
-              (f (+ 1 2))))
-
-;; p6-p9 for testing closures
-(define p6 '(let ([x 10])
+;; p4-p7 for testing closures
+(define p4 '(let ([x 10])
               (lambda (y) (+ x y))))
 
-(define p7 '(let ([x 10])
+(define p5 '(let ([x 10])
               ((lambda (y) (+ x y)) 20)))
 
-(define p8 '(let ([f (let ([x 10])
+(define p6 '(let ([f (let ([x 10])
                        (lambda (y) (+ x y)))])
               (let ([x 20])
                 (f x))))
 
-(define p9 '(let ([f (let ([x 10])
+(define p7 '(let ([f (let ([x 10])
                        (lambda (y) (+ x y)))])
               (f 20)))
 
@@ -89,7 +82,7 @@ we can use `let` to bind identifiers to lambdas. E.g.,
 
     ;; let expressions
     [(list 'let (list (list id val) ...) body)
-     (let-exp (map parse id) (map parse val) (parse body))]
+     (let-exp id (map parse val) (parse body))]
     
     ;; lambda expressions
     [_ (void)]
@@ -102,42 +95,40 @@ we can use `let` to bind identifiers to lambdas. E.g.,
 
 
 ;; Interpreter
-(define (eval expr)
-  (let eval-env ([expr expr]
-                 [env '()])
-    (match expr
-      ;; int literals
-      [(int-exp val) val]
+(define (eval expr [env '()])
+  (match expr
+    ;; int literals
+    [(int-exp val) val]
 
-      ;; arithmetic expressions    
-      [(arith-exp "PLUS" lhs rhs)
-       (+ (eval-env lhs env) (eval-env rhs env))]
-      [(arith-exp "TIMES" lhs rhs)
-       (* (eval-env lhs env) (eval-env rhs env))]         
+    ;; arithmetic expressions    
+    [(arith-exp "PLUS" lhs rhs)
+      (+ (eval lhs env) (eval rhs env))]
+    [(arith-exp "TIMES" lhs rhs)
+      (* (eval lhs env) (eval rhs env))]         
 
-      ;; variable binding
-      [(var-exp id)
-       (let ([pair (assoc id env)])
-         (if pair
-             (cdr pair)
-             (error (format "~a not bound!" id))))]
+    ;; variable binding
+    [(var-exp id)
+      (let ([pair (assoc id env)])
+        (if pair
+            (cdr pair)
+            (error (format "~a not bound!" id))))]
 
-      ;; let expression with multiple variables
-      [(let-exp (list (var-exp id) ...) (list val ...) body)
-       (let ([vars (map cons id
-                        (map (lambda (v)
-                               (eval-env v env))
-                             val))])
-         (eval-env body (append vars env)))]
+    ;; let expression with multiple variables
+    [(let-exp (list id ...) (list val ...) body)
+      (let ([vars (map cons id
+                      (map (lambda (v)
+                              (eval v env))
+                            val))])
+        (eval body (append vars env)))]
 
-      ;; lambda expression
-      [_ (void)]
-      
-      ;; function application
-      [_ (void)]
+    ;; lambda expression
+    [_ (void)]
+    
+    ;; function application
+    [_ (void)]
 
-      ;; basic error handling
-      [_ (error (format "Can't evaluate: ~a" expr))])))
+    ;; basic error handling
+    [_ (error (format "Can't evaluate: ~a" expr))]))
 
 
 ;; REPL

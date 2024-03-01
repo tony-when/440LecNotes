@@ -66,6 +66,12 @@ first iteration will support integer literals, the binary arithmetic operations
                 (+ x (let ([w 30])
                        (* w y)))))")
 
+;; for demonstrating strict/lazy evaluation
+(define p8 "(let ([x (+ 1 2)])
+              20)")
+
+(define p9 "(let ([x (+ 1 2)])
+              (* x (+ x x)))")
 
 
 #|-----------------------------------------------------------------------------

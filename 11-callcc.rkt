@@ -24,60 +24,35 @@ the result of `proc` is the result of `call/cc`.
 
 ;; evaluate & explain:
 
-; (* 10 (call/cc (lambda (_) 20)))
+#; (* 10 (call/cc (lambda (_) 20)))
 
-; (* 10 (call/cc (lambda (k) (k 20))))
+#; (* 10 (call/cc (lambda (k) (k 20))))
 
-; (* 10 (call/cc (lambda (k) (k (* 2 10)))))
+#; (* 10 (call/cc (lambda (k) (k (* 2 10)))))
 
-; (* 10 (call/cc (lambda (k) (* 2 (k 10)))))
+#; (* 10 (call/cc (lambda (k) (* 2 (k 10)))))
 
 
 ;; we can save a continuation!
 (define *k* void)
 
-(define (arith x)
-  (* x (call/cc (lambda (k)
-                  (set! *k* k)
-                  (k 0)))))
-
-; (arith 10)
-; (*k* 1)
-; (*k* 11)
-; (arith 20)
-; (*k* 11)
-
+(define (arith x y z)
+  (+ x (* y (/ z (call/cc (lambda (k) 
+                            (set! *k* k)
+                            (k 10)))))))
 
 (define (save-cc! x)
   (call/cc (lambda (k)
              (set! *k* k)
              (k x))))
 
-(define (arith2 x y z)
-  (+ x (/ (+ (save-cc! 0) y) z)))
 
-; (arith2 10 5 10)
-; (*k* 25)
-
-
-;; continuations are dynamic, not lexical!
-(define (sum-from n)
+(define (sum-to n)
   (if (= n 0)
       (save-cc! 0)
-      (+ n (sum-from (sub1 n)))))
+      (+ n (sum-to (sub1 n)))))
 
-; (sum-from 10)
-; (*k* 10)
-
-
-#; ; the extent of continuations can be controlled
-(* 10 (+ 100
-         (call-with-continuation-prompt ; creates a continuation "ceiling"
-          (lambda ()
-            (+ 5 (* 3
-                    (save-cc! 0)))))))
-
-; (*k* 10)
+(trace sum-to)
 
 
 #|-----------------------------------------------------------------------------
@@ -87,10 +62,8 @@ the result of `proc` is the result of `call/cc`.
 ;; what does this function do?
 (define (foo)
   (let ([kk (call/cc (lambda (k) (k k)))])
-    (kk kk)))
+    (kk kk))) ; acts like a goto
 
-
-;; we can define some utility functions
 (define (current-continuation)
   (call/cc (lambda (k) (k k))))
 
@@ -102,7 +75,7 @@ the result of `proc` is the result of `call/cc`.
          [loop (current-continuation)])
     (println x)
     (set! x (add1 x))
-    (when (< x 10)
+    (when (< x n)
       (goto loop))))
 
 
@@ -110,74 +83,15 @@ the result of `proc` is the result of `call/cc`.
 ;; ... as an escape hatch
 -----------------------------------------------------------------------------|#
 
-;; short-circuit break/return
-(define (find pred lst)
-  (call/cc 
-   (lambda (return)
-     (for ([x lst])
-       (when (pred x)
-         (return x))))))
-
-; (find (curry = 5) (range 10))
-
-
-;; non-local exit!
-(define (find2 pred lst)
-  (call/cc 
-   (lambda (return)
-     (for ([x lst])
-       (pred x return)))))
-
-#; (find2 (lambda (x return)
-            (when (= x 5) (return x)))
-          (range 10))
-
-
-#|-----------------------------------------------------------------------------
-;; ... for implementing co-routines
------------------------------------------------------------------------------|#
-
-(define (ping k n)
-  (let loop ([i 1])
-    (println (format "ping ~a" i))
-    (set! k (call/cc k)) ; each time back, k is a continuation in pong!
-    (when (< i n)
-      (loop (add1 i)))))
-
-(define (pong k)
-  (let loop ()
-    (println "pong")
-    (set! k (call/cc k))
-    (loop)))
-
-(trace ping pong)
-
-;; more realistically
-(define (long-computation k)
-  (println "Phase 1")
-  (sleep 0.5)
-  (set! k (call/cc k))
-  (println "Phase 2")
-  (sleep 0.5)
-  (set! k (call/cc k))
-  (println "Phase 3")
-  (sleep 0.5)
-  (set! k (call/cc k))
-  (sleep 0.5)
-  (println "Done"))
-
-(define (periodic-task k)
-  (let loop ([x 0])
-    (println (format "Periodic task ~a" x))
-    (sleep 0.5)
-    (set! k (call/cc k))
-    (loop (add1 x))))
-
-; (long-computation periodic-task)
-
-
-;; even better, write a function that cycles between different continuations
-;; to resume executing --- an implementation of lightweight "threads"
+;; short-circuiting product
+(define (prod lst)
+  (call/cc
+    (lambda (break) ; break represents the continuation
+      (trace-let p ([lst lst])
+        (cond [(empty? lst) 1]
+              [(= 0 (first lst)) (break 0)]
+              [else (* (first lst) (p (rest lst)))])))))
+        
 
 
 #|-----------------------------------------------------------------------------
